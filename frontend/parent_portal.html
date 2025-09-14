@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Sales Portal</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* Basic styling for the form */
+        .form-section {
+            display: none;
+        }
+
+        .active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Container -->
+    <div class="w-full max-w-lg p-6 bg-white rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Book Sales Portal</h1>
+        <p class="text-center text-gray-600 mb-6">Please provide the details below to proceed.</p>
+
+        <!-- Dynamic Message Area -->
+        <div id="messageArea" class="mb-4 text-center"></div>
+        
+        <!-- Student Information Form Section -->
+        <div id="studentInfoSection" class="form-section active">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Student Information</h2>
+            <form id="studentInfoForm" class="space-y-4">
+                <div>
+                    <label for="studentName" class="block text-gray-700 font-medium mb-1">Student's Name</label>
+                    <input type="text" id="studentName" name="studentName" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="studentClass" class="block text-gray-700 font-medium mb-1">Student's Class</label>
+                    <input type="text" id="studentClass" name="studentClass" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button type="submit"
+                    class="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200">
+                    Proceed
+                </button>
+            </form>
+        </div>
+
+        <!-- Book Selection and Order Submission Form Section -->
+        <div id="bookSelectionSection" class="form-section">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Book and Stationery Selection</h2>
+            <form id="orderForm" class="space-y-4">
+                <div id="itemsContainer" class="space-y-4">
+                    <!-- Checkboxes and quantity inputs will be dynamically inserted here -->
+                </div>
+                
+                <div class="flex justify-between items-center text-lg font-bold text-gray-800 border-t pt-4">
+                    <span>Total Amount:</span>
+                    <span id="totalAmountDisplay" class="text-right">GH₵0.00</span>
+                </div>
+
+                <div class="text-sm text-gray-500 mt-2">
+                    <p>Prices are for reference. The final amount will be verified upon submission.</p>
+                </div>
+
+                <button type="submit"
+                    class="w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-colors duration-200">
+                    Submit Order
+                </button>
+            </form>
+        </div>
+        
+    </div>
+
+    <!-- Modal for Success/Error Messages -->
+    <div id="modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm text-center">
+            <h3 id="modalTitle" class="text-xl font-bold mb-4"></h3>
+            <p id="modalMessage" class="text-gray-700 mb-6"></p>
+            <button id="modalCloseBtn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'http://localhost:3000'; // Replace with your Render backend URL
+
+        // DOM element references
+        const messageArea = document.getElementById('messageArea');
+        const studentInfoSection = document.getElementById('studentInfoSection');
+        const studentInfoForm = document.getElementById('studentInfoForm');
+        const studentNameInput = document.getElementById('studentName');
+        const studentClassInput = document.getElementById('studentClass');
+        const bookSelectionSection = document.getElementById('bookSelectionSection');
+        const itemsContainer = document.getElementById('itemsContainer');
+        const orderForm = document.getElementById('orderForm');
+        const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
+        
+        let allItems = []; // To store the list of all books and stationery from the API
+        let qrCode = null; // To store the unique QR code from the URL
+
+        // --- Utility Functions ---
+
+        // Function to show the modal with a message
+        const showModal = (title, message) => {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+        };
+
+        // Function to hide the modal
+        const hideModal = () => {
+            modal.classList.add('hidden');
+        };
+
+        // --- Core Application Logic ---
+
+        // Check for QR code in the URL on page load
+        const urlParams = new URLSearchParams(window.location.search);
+        qrCode = urlParams.get('code');
+
+        if (!qrCode) {
+            studentInfoSection.classList.remove('active');
+            messageArea.innerHTML = `<p class="text-red-500 font-semibold">Invalid or missing QR code. Please contact the receptionist.</p>`;
+        } else {
+            // If QR code exists, proceed with the first form
+            studentInfoSection.classList.add('active');
+        }
+
+        // Handle the submission of the student information form
+        studentInfoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Show a loading message
+            messageArea.innerHTML = `<p class="text-gray-500">Loading book list...</p>`;
+            studentInfoForm.querySelector('button').disabled = true;
+
+            try {
+                // Fetch the list of all books and stationery from the backend
+                const response = await fetch(`${BACKEND_URL}/books`);
+                if (!response.ok) {
+                    throw new Error('Failed to load book list.');
+                }
+                allItems = await response.json();
+                
+                // Once books are loaded, switch to the book selection section
+                studentInfoSection.classList.remove('active');
+                bookSelectionSection.classList.add('active');
+                messageArea.innerHTML = ''; // Clear loading message
+
+                // Render the items for the parent to select
+                renderItems();
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                messageArea.innerHTML = `<p class="text-red-500 font-semibold">Error loading items. Please try again.</p>`;
+                studentInfoForm.querySelector('button').disabled = false;
+            }
+        });
+
+        // Function to render the dynamic list of items
+        const renderItems = () => {
+            itemsContainer.innerHTML = ''; // Clear previous items
+
+            const studentClass = studentClassInput.value.trim().toLowerCase();
+            const filteredItems = allItems.filter(item => item.class.toLowerCase() === studentClass);
+            
+            if (filteredItems.length === 0) {
+                 itemsContainer.innerHTML = `<p class="text-gray-500">No books found for this class. Please contact the receptionist.</p>`;
+                 return;
+            }
+
+            filteredItems.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200';
+                itemDiv.innerHTML = `
+                    <div class="flex-grow">
+                        <label for="item-${item.id}" class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="item-${item.id}" data-price="${item.price}" data-title="${item.title}" data-id="${item.id}"
+                                class="h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
+                            <span class="text-gray-800 font-medium">${item.title}</span>
+                            <span class="text-gray-500 text-sm">(${item.is_book ? 'Book' : 'Stationery'})</span>
+                        </label>
+                        <span class="text-sm text-gray-600 block mt-1">GH₵${parseFloat(item.price).toFixed(2)}</span>
+                    </div>
+                    <input type="number" data-id="${item.id}" value="1" min="1" disabled
+                        class="quantity-input w-20 px-2 py-1 text-center border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                `;
+                itemsContainer.appendChild(itemDiv);
+            });
+        };
+        
+        // Listen for changes in the item container to update the total and quantity inputs
+        itemsContainer.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.type === 'checkbox') {
+                const quantityInput = document.querySelector(`.quantity-input[data-id="${target.dataset.id}"]`);
+                quantityInput.disabled = !target.checked;
+                // Reset quantity to 1 if unchecked
+                if (!target.checked) {
+                    quantityInput.value = 1;
+                }
+            }
+            updateTotal();
+        });
+
+        itemsContainer.addEventListener('input', (e) => {
+            if (e.target.classList.contains('quantity-input')) {
+                updateTotal();
+            }
+        });
+
+        // Function to update the total amount
+        const updateTotal = () => {
+            let total = 0;
+            const checkedItems = document.querySelectorAll('input[type="checkbox"]:checked');
+            checkedItems.forEach(checkbox => {
+                const quantityInput = document.querySelector(`.quantity-input[data-id="${checkbox.dataset.id}"]`);
+                const price = parseFloat(checkbox.dataset.price);
+                const quantity = parseInt(quantityInput.value, 10);
+                total += price * quantity;
+            });
+            totalAmountDisplay.textContent = `GH₵${total.toFixed(2)}`;
+        };
+
+        // Handle the submission of the entire order
+        orderForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const checkedItems = document.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkedItems.length === 0) {
+                showModal('No Items Selected', 'Please select at least one book or stationery item.');
+                return;
+            }
+
+            const items = Array.from(checkedItems).map(checkbox => {
+                const quantityInput = document.querySelector(`.quantity-input[data-id="${checkbox.dataset.id}"]`);
+                return {
+                    id: checkbox.dataset.id,
+                    title: checkbox.dataset.title,
+                    price: parseFloat(checkbox.dataset.price),
+                    quantity: parseInt(quantityInput.value, 10)
+                };
+            });
+            
+            const totalAmount = parseFloat(totalAmountDisplay.textContent.replace('GH₵', ''));
+            const studentName = studentNameInput.value.trim();
+            const studentClass = studentClassInput.value.trim();
+
+            const orderData = {
+                qr_code: qrCode,
+                student_name: studentName,
+                student_class: studentClass,
+                items: items,
+                total_amount: totalAmount
+            };
+
+            // Show a loading state
+            orderForm.querySelector('button').disabled = true;
+            orderForm.querySelector('button').textContent = 'Submitting...';
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/submit-sale`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orderData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to submit order.');
+                }
+                
+                showModal('Order Submitted', `Your order has been submitted successfully! The total amount is ${totalAmountDisplay.textContent}.`);
+                orderForm.reset();
+                bookSelectionSection.classList.remove('active');
+                studentInfoSection.classList.add('active');
+            } catch (error) {
+                console.error('Error submitting order:', error);
+                showModal('Submission Error', error.message);
+            } finally {
+                orderForm.querySelector('button').disabled = false;
+                orderForm.querySelector('button').textContent = 'Submit Order';
+            }
+        });
+
+        // Event listener for the modal close button
+        modalCloseBtn.addEventListener('click', hideModal);
+    </script>
+</body>
+
+</html>

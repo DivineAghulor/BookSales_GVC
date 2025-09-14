@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice - Book Sales</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        @media print {
+            body {
+                background-color: #fff;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            .invoice-container {
+                box-shadow: none;
+                border: 1px solid #000;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="loading" class="text-center">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+        <p class="text-gray-600">Loading invoice...</p>
+    </div>
+
+    <div id="errorMessage" class="w-full max-w-2xl p-6 bg-red-100 text-red-700 rounded-xl shadow-lg hidden">
+        <p id="errorText" class="text-center font-medium"></p>
+    </div>
+
+    <div id="invoiceContainer" class="invoice-container w-full max-w-2xl p-8 bg-white rounded-xl shadow-lg hidden">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 mb-4">
+            <div class="mb-4 sm:mb-0">
+                <h1 class="text-4xl font-bold text-gray-800">Invoice</h1>
+                <p id="invoiceNumber" class="text-sm text-gray-500 mt-1"></p>
+            </div>
+            <div class="text-right">
+                <h2 class="text-xl font-semibold text-gray-700">School Book Sales</h2>
+                <p class="text-gray-500">Date: <span id="invoiceDate"></span></p>
+            </div>
+        </div>
+
+        <!-- Billing Info -->
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-700">Student Details</h3>
+            <p class="text-gray-600 mt-2">Name: <span id="studentName"></span></p>
+            <p class="text-gray-600">Class: <span id="studentClass"></span></p>
+        </div>
+
+        <!-- Items Table -->
+        <div class="mb-6">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (GH₵)</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal (GH₵)</th>
+                    </tr>
+                </thead>
+                <tbody id="invoiceTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- Invoice items will be dynamically loaded here -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Total -->
+        <div class="text-right text-xl font-bold text-gray-800 border-t pt-4">
+            Total Amount: <span id="totalAmount">GH₵0.00</span>
+        </div>
+        
+        <div class="flex justify-end space-x-4 mt-8 no-print">
+            <button id="printBtn" class="px-6 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200">Print</button>
+            <a href="admin_reports.html" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg shadow-md hover:bg-gray-300 transition-colors duration-200">Back to Reports</a>
+        </div>
+    </div>
+
+    <script>
+        // Check for authentication token on page load
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+            window.location.href = 'admin_login.html';
+        }
+
+        // DOM elements
+        const loadingDiv = document.getElementById('loading');
+        const errorMessageDiv = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        const invoiceContainer = document.getElementById('invoiceContainer');
+        const invoiceNumberSpan = document.getElementById('invoiceNumber');
+        const invoiceDateSpan = document.getElementById('invoiceDate');
+        const studentNameSpan = document.getElementById('studentName');
+        const studentClassSpan = document.getElementById('studentClass');
+        const invoiceTableBody = document.getElementById('invoiceTableBody');
+        const totalAmountSpan = document.getElementById('totalAmount');
+        const printBtn = document.getElementById('printBtn');
+        
+        // Backend URL
+        const BACKEND_URL = 'http://localhost:3000';
+
+        // Function to show an error message
+        const showError = (message) => {
+            loadingDiv.classList.add('hidden');
+            invoiceContainer.classList.add('hidden');
+            errorMessageDiv.classList.remove('hidden');
+            errorText.textContent = message;
+        };
+
+        // Function to fetch and render the invoice
+        const fetchAndRenderInvoice = async () => {
+            // Get the invoice ID from the URL query parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const invoiceId = urlParams.get('id');
+
+            if (!invoiceId) {
+                showError('Missing invoice ID in URL.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/sales/${invoiceId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        localStorage.removeItem('adminToken');
+                        window.location.href = 'admin_login.html';
+                    }
+                    throw new Error('Failed to fetch invoice details. It may not exist.');
+                }
+                const invoice = await response.json();
+                
+                // Populate invoice details
+                invoiceNumberSpan.textContent = `Invoice #: ${invoice.id}`;
+                invoiceDateSpan.textContent = new Date(invoice.created_at).toLocaleString();
+                studentNameSpan.textContent = invoice.student_name;
+                studentClassSpan.textContent = invoice.class;
+                totalAmountSpan.textContent = `GH₵${parseFloat(invoice.total_amount).toFixed(2)}`;
+
+                // Clear previous table content
+                invoiceTableBody.innerHTML = '';
+                
+                // Populate invoice items
+                invoice.items.forEach(item => {
+                    const row = document.createElement('tr');
+                    const subtotal = parseFloat(item.price) * item.quantity;
+                    row.innerHTML = `
+                        <td class="px-4 py-2">${item.title}</td>
+                        <td class="px-4 py-2">${item.quantity}</td>
+                        <td class="px-4 py-2">${parseFloat(item.price).toFixed(2)}</td>
+                        <td class="px-4 py-2">${subtotal.toFixed(2)}</td>
+                    `;
+                    invoiceTableBody.appendChild(row);
+                });
+
+                loadingDiv.classList.add('hidden');
+                invoiceContainer.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error fetching invoice:', error);
+                showError(error.message);
+            }
+        };
+
+        // Event listener for the print button
+        printBtn.addEventListener('click', () => {
+            window.print();
+        });
+
+        // Initial fetch on page load
+        fetchAndRenderInvoice();
+    </script>
+</body>
+
+</html>

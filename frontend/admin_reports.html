@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Reports</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .toggle-section-btn {
+            background-color: #e5e7eb;
+        }
+
+        .toggle-section-btn.active {
+            background-color: #d1d5db;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+
+    <div class="w-full max-w-2xl p-6 bg-white rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Admin Reports</h1>
+        
+        <a href="admin_dashboard.html"
+            class="block w-full px-6 py-3 mb-4 text-center bg-gray-200 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2">
+            Back to Dashboard
+        </a>
+
+        <!-- Sales Report Section -->
+        <div class="mb-8">
+            <button id="salesReportBtn" class="toggle-section-btn w-full px-4 py-3 text-left font-semibold text-gray-800 rounded-lg flex justify-between items-center transition-colors duration-200">
+                Sales Report
+                <svg id="salesArrow" class="w-5 h-5 transform rotate-0 transition-transform duration-200" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+            </button>
+            <div id="salesReportContent" class="mt-4 hidden overflow-x-auto">
+                <table class="min-w-full bg-white rounded-lg shadow-md">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                            <th class="px-4 py-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="salesTableBody" class="divide-y divide-gray-200">
+                        <!-- Sales data will be dynamically loaded here -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="salesLoading" class="text-center mt-4 hidden">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            </div>
+        </div>
+
+        <!-- QR Code Usage Section -->
+        <div>
+            <button id="qrReportBtn" class="toggle-section-btn w-full px-4 py-3 text-left font-semibold text-gray-800 rounded-lg flex justify-between items-center transition-colors duration-200">
+                QR Code Usage
+                <svg id="qrArrow" class="w-5 h-5 transform rotate-0 transition-transform duration-200" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+            </button>
+            <div id="qrReportContent" class="mt-4 hidden overflow-x-auto">
+                <table class="min-w-full bg-white rounded-lg shadow-md">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage Count</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Generated At</th>
+                        </tr>
+                    </thead>
+                    <tbody id="qrTableBody" class="divide-y divide-gray-200">
+                        <!-- QR data will be dynamically loaded here -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="qrLoading" class="text-center mt-4 hidden">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            </div>
+        </div>
+
+        <button id="logoutBtn"
+            class="mt-8 w-full px-4 py-2 text-gray-800 bg-red-200 rounded-lg shadow-md hover:bg-red-300 transition-colors duration-200">
+            Logout
+        </button>
+    </div>
+
+    <script>
+        // Check for authentication token on page load
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+            window.location.href = 'admin_login.html';
+        }
+        
+        // Backend URL
+        const BACKEND_URL = 'http://localhost:3000';
+
+        // DOM elements
+        const salesReportBtn = document.getElementById('salesReportBtn');
+        const salesReportContent = document.getElementById('salesReportContent');
+        const salesTableBody = document.getElementById('salesTableBody');
+        const salesLoading = document.getElementById('salesLoading');
+        const salesArrow = document.getElementById('salesArrow');
+
+        const qrReportBtn = document.getElementById('qrReportBtn');
+        const qrReportContent = document.getElementById('qrReportContent');
+        const qrTableBody = document.getElementById('qrTableBody');
+        const qrLoading = document.getElementById('qrLoading');
+        const qrArrow = document.getElementById('qrArrow');
+        
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // Function to fetch and display the sales report
+        const fetchSalesReport = async () => {
+            salesLoading.classList.remove('hidden');
+            try {
+                const response = await fetch(`${BACKEND_URL}/sales-report`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        localStorage.removeItem('adminToken');
+                        window.location.href = 'admin_login.html';
+                    }
+                    throw new Error('Failed to fetch sales report.');
+                }
+                const sales = await response.json();
+                renderSalesReport(sales);
+            } catch (error) {
+                console.error('Error fetching sales report:', error);
+                salesTableBody.innerHTML = `<tr><td colspan="6" class="px-4 py-2 text-center text-red-600">Failed to load sales data.</td></tr>`;
+            } finally {
+                salesLoading.classList.add('hidden');
+            }
+        };
+
+        // Function to render the sales report data in the table
+        const renderSalesReport = (sales) => {
+            salesTableBody.innerHTML = ''; // Clear previous content
+            if (sales.length === 0) {
+                salesTableBody.innerHTML = `<tr><td colspan="6" class="px-4 py-2 text-center text-gray-500">No sales entries found.</td></tr>`;
+                return;
+            }
+
+            sales.forEach(sale => {
+                const itemsList = sale.items.map(item => `${item.title} (${item.quantity})`).join(', ');
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors duration-200';
+                row.innerHTML = `
+                    <td class="px-4 py-2 whitespace-nowrap">${new Date(sale.created_at).toLocaleString()}</td>
+                    <td class="px-4 py-2 whitespace-nowrap">${sale.student_name}</td>
+                    <td class="px-4 py-2 whitespace-nowrap">${sale.class}</td>
+                    <td class="px-4 py-2">${itemsList}</td>
+                    <td class="px-4 py-2 whitespace-nowrap font-medium">GH₵${parseFloat(sale.total_amount).toFixed(2)}</td>
+                    <td class="px-4 py-2 text-right">
+                        <a href="invoice_view.html?id=${sale.id}" class="text-blue-600 hover:underline">View Invoice</a>
+                    </td>
+                `;
+                salesTableBody.appendChild(row);
+            });
+        };
+
+        // Function to fetch and display the QR code report
+        const fetchQrReport = async () => {
+            qrLoading.classList.remove('hidden');
+            try {
+                const response = await fetch(`${BACKEND_URL}/qr-report`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        localStorage.removeItem('adminToken');
+                        window.location.href = 'admin_login.html';
+                    }
+                    throw new Error('Failed to fetch QR code report.');
+                }
+                const qrs = await response.json();
+                renderQrReport(qrs);
+            } catch (error) {
+                console.error('Error fetching QR code report:', error);
+                qrTableBody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-center text-red-600">Failed to load QR code data.</td></tr>`;
+            } finally {
+                qrLoading.classList.add('hidden');
+            }
+        };
+
+        // Function to render the QR code report data in the table
+        const renderQrReport = (qrs) => {
+            qrTableBody.innerHTML = ''; // Clear previous content
+            if (qrs.length === 0) {
+                qrTableBody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-center text-gray-500">No QR codes found.</td></tr>`;
+                return;
+            }
+
+            qrs.forEach(qr => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors duration-200';
+                row.innerHTML = `
+                    <td class="px-4 py-2">${qr.code}</td>
+                    <td class="px-4 py-2">${qr.usage_count}</td>
+                    <td class="px-4 py-2">${new Date(qr.created_at).toLocaleString()}</td>
+                `;
+                qrTableBody.appendChild(row);
+            });
+        };
+
+        // Toggle visibility and fetch data for sections
+        salesReportBtn.addEventListener('click', () => {
+            const isHidden = salesReportContent.classList.contains('hidden');
+            if (isHidden) {
+                salesReportContent.classList.remove('hidden');
+                salesArrow.classList.add('rotate-180');
+                fetchSalesReport();
+            } else {
+                salesReportContent.classList.add('hidden');
+                salesArrow.classList.remove('rotate-180');
+            }
+        });
+
+        qrReportBtn.addEventListener('click', () => {
+            const isHidden = qrReportContent.classList.contains('hidden');
+            if (isHidden) {
+                qrReportContent.classList.remove('hidden');
+                qrArrow.classList.add('rotate-180');
+                fetchQrReport();
+            } else {
+                qrReportContent.classList.add('hidden');
+                qrArrow.classList.remove('rotate-180');
+            }
+        });
+        
+        // Logout button functionality
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('adminToken');
+            window.location.href = 'admin_login.html';
+        });
+
+    </script>
+</body>
+
+</html>

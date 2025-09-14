@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-sm p-6 bg-white rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Admin Login</h1>
+
+        <form id="loginForm" class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                <input type="text" id="username" name="username" required
+                    class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                <input type="password" id="password" name="password" required
+                    class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <button type="submit"
+                class="w-full px-4 py-2 text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200">
+                Login
+            </button>
+        </form>
+
+        <p id="message" class="mt-4 text-center text-sm text-red-600"></p>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const messageDiv = document.getElementById('message');
+        const BACKEND_URL = 'http://localhost:3000'; // Replace with your Render backend URL
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            messageDiv.textContent = 'Logging in...';
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    messageDiv.textContent = data.message || 'Login failed. Please try again.';
+                    return;
+                }
+
+                // Store the JWT in local storage
+                localStorage.setItem('adminToken', data.token);
+                messageDiv.textContent = 'Login successful!';
+
+                // Redirect to the protected dashboard
+                window.location.href = 'admin_dashboard.html';
+
+            } catch (error) {
+                console.error('Error:', error);
+                if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                    messageDiv.textContent = 'Could not connect to the backend server. Please make sure the backend is running by navigating to its directory and running `npm start`.';
+                } else {
+                    messageDiv.textContent = 'An error occurred. Please try again later.';
+                }
+            }
+        });
+
+        // This is a one-time use page for registering the first admin
+        // Once an admin is registered, you can remove this script from a production environment
+        // The endpoint is designed to be unauthenticated for initial setup
+        async function registerFirstAdmin() {
+            const firstAdminUsername = "admin";
+            const firstAdminPassword = "password";
+            try {
+                const response = await fetch(`${BACKEND_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: firstAdminUsername, password: firstAdminPassword })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    console.log('Default admin user created successfully:', data.message);
+                } else {
+                    // This is expected if the admin user already exists
+                    console.warn('Admin user registration failed (probably already exists):', data.message);
+                }
+            } catch (error) {
+                console.error('Error registering default admin:', error);
+                if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                    // Do not show an on-screen message here, as it's a background process
+                    console.error('Could not connect to backend to register default admin. Please ensure your backend is running.');
+                }
+            }
+        }
+        // Call the registration function on page load to ensure a default admin exists
+        registerFirstAdmin();
+    </script>
+</body>
+
+</html>
